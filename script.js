@@ -1,12 +1,3 @@
-// Запрашиваем ключ у пользователя или берем из памяти браузера
-let API_KEY = localStorage.getItem("gemini_api_key");
-
-if (!API_KEY) {
-  API_KEY = prompt("Введите ваш Gemini API Key:");
-  if (API_KEY) {
-    localStorage.setItem("gemini_api_key", API_KEY);
-  }
-}
 // Подсчет очков племен
 const scores = {
   clan1: 0,
@@ -23,9 +14,28 @@ const eraNames = {
   eneolithic: 'Энеолит в Казахстане (Ботайская культура, одомашнивание лошадей)'
 };
 
+// Функция получения API-ключа у пользователя
+function getApiKey() {
+  let key = localStorage.getItem("gemini_api_key");
+  
+  if (!key || key.trim() === "") {
+    key = prompt("Введите ваш новый Gemini API Key (начинается на AIza...):");
+    if (key && key.trim() !== "") {
+      localStorage.setItem("gemini_api_key", key.trim());
+    } else {
+      alert("Без API-ключа генерация ИИ работать не будет!");
+      return null;
+    }
+  }
+  return key;
+}
+
 // 2. Универсальная функция обращения к Gemini API
-async function askGemini(prompt) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${API_KEY}`;
+async function askGemini(promptText) {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error("API Key отсутствует");
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
 
   try {
     const response = await fetch(url, {
@@ -36,7 +46,7 @@ async function askGemini(prompt) {
       body: JSON.stringify({
         contents: [
           {
-            parts: [{ text: prompt }]
+            parts: [{ text: promptText }]
           }
         ]
       })
@@ -45,6 +55,11 @@ async function askGemini(prompt) {
     const data = await response.json();
 
     if (!response.ok) {
+      // Если ключ недействительный, сбрасываем его из памяти, чтобы спросить снова
+      if (response.status === 400 || response.status === 401) {
+        localStorage.removeItem("gemini_api_key");
+        alert("Недействительный API-ключ. Пожалуйста, обновите страницу и введите правильный ключ.");
+      }
       console.error("Детали ошибки от Google API:", data);
       throw new Error(data.error?.message || `Ошибка сервера: ${response.status}`);
     }
@@ -60,7 +75,7 @@ async function askGemini(prompt) {
 async function generateAIQuestion(eraKey) {
   const eraInfo = eraNames[eraKey] || 'Каменный век в Казахстане';
   
-  const prompt = `
+  const promptText = `
     Ты эксперт по истории Казахстана. Создай 1 уникальный тестовый вопрос для школы по теме "${eraInfo}".
     
     Верни ответ СТРОГО в формате JSON без кавычек markdown:
@@ -72,7 +87,7 @@ async function generateAIQuestion(eraKey) {
     Где "correct" — индекс правильного ответа (0, 1 или 2).
   `;
 
-  const rawResponse = await askGemini(prompt);
+  const rawResponse = await askGemini(promptText);
   const cleanJson = rawResponse.replace(/```json|```/g, '').trim();
   return JSON.parse(cleanJson);
 }
@@ -149,10 +164,10 @@ document.getElementById('generate-essay-btn').onclick = async () => {
 
   topicText.innerText = "⏳ ИИ генерирует уникальное историческое задание...";
 
-  const prompt = `Ты учитель истории Казахстана. Придумай 1 короткое ролевое задание для эссе по теме "${eraBadge}". В 1-2 предложения (например: "Представь, что ты мастер Ботайской культуры..."). Выдай только текст задания.`;
+  const promptText = `Ты учитель истории Казахстана. Придумай 1 короткое ролевое задание для эссе по теме "${eraBadge}". В 1-2 предложения (например: "Представь, что ты мастер Ботайской культуры..."). Выдай только текст задания.`;
 
   try {
-    const aiResponse = await askGemini(prompt);
+    const aiResponse = await askGemini(promptText);
     topicText.innerText = aiResponse;
   } catch (error) {
     console.error(error);
@@ -174,7 +189,7 @@ document.getElementById('check-essay-btn').onclick = async () => {
   feedbackBox.classList.remove('hidden');
   feedbackBox.innerText = "⏳ ИИ-Эксперт оценивает работу...";
 
-  const prompt = `
+  const promptText = `
     Ты эксперт по истории Казахстана. Оцени эссе ученика.
     Тема: "${topic}".
     Текст: "${essayText}".
@@ -186,7 +201,7 @@ document.getElementById('check-essay-btn').onclick = async () => {
   `;
 
   try {
-    const evaluation = await askGemini(prompt);
+    const evaluation = await askGemini(promptText);
     feedbackBox.innerText = evaluation;
   } catch (error) {
     console.error(error);
