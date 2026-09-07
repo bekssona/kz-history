@@ -1,116 +1,98 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Stone Age in Kazakhstan — Игра с ИИ</title>
-  <!-- Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    .land {
-      fill: #475569;
-      stroke: #0f172a;
-      stroke-width: 2;
-      cursor: pointer;
-      transition: all 0.3s ease;
-    }
-    .land:hover {
-      fill: #64748b;
-      filter: drop-shadow(0 0 10px rgba(251, 191, 36, 0.5));
-    }
-  </style>
-</head>
-<body class="bg-stone-900 text-stone-100 font-sans min-h-screen p-6">
+<!-- Карта Стоянок -->
+<section class="lg:col-span-2 bg-stone-800 p-4 sm:p-6 rounded-xl border border-stone-700 shadow-2xl">
+  <h2 class="text-2xl font-bold mb-4 text-amber-400">Карта Древних Стоянок</h2>
+  
+  <div class="relative flex justify-center py-2">
+    <svg id="stone-age-map" viewBox="0 0 600 350" class="w-full h-auto max-w-xl overflow-visible">
+      <!-- Палеолит -->
+      <g>
+        <path id="paleolithic" class="land" d="M200 200 L380 200 L320 320 L180 290 Z" />
+        <text x="270" y="250" text-anchor="middle" class="map-text">
+          <tspan x="270" dy="0" font-weight="bold" fill="#fbbf24">Палеолит</tspan>
+          <tspan x="270" dy="14" font-size="9.5px" fill="#d1d5db">(Шакпакаты, Каратау)</tspan>
+        </text>
+      </g>
 
-  <!-- Шапка -->
-  <header class="text-center mb-8">
-    <h1 class="text-4xl font-extrabold text-amber-500 mb-2">🗿 Stone Age in Kazakhstan</h1>
-    <p class="text-stone-400">Пройдите путь от Палеолита до Энеолита с поддержкой ИИ-Наставника!</p>
-  </header>
+      <!-- Мезолит -->
+      <g>
+        <path id="mesolithic" class="land" d="M220 50 L380 50 L380 190 L200 190 Z" />
+        <text x="290" y="110" text-anchor="middle" class="map-text">
+          <tspan x="290" dy="0" font-weight="bold" fill="#fbbf24">Мезолит</tspan>
+          <tspan x="290" dy="14" font-size="9.5px" fill="#d1d5db">(Тельманка, Мичурин)</tspan>
+        </text>
+      </g>
 
-  <main class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <!-- Неолит -->
+      <g>
+        <path id="neolithic" class="land" d="M390 50 L560 30 L540 220 L390 190 Z" />
+        <text x="470" y="115" text-anchor="middle" class="map-text">
+          <tspan x="470" dy="0" font-weight="bold" fill="#fbbf24">Неолит</tspan>
+          <tspan x="470" dy="14" font-size="9.5px" fill="#d1d5db">(Сексеул)</tspan>
+        </text>
+      </g>
+
+      <!-- Энеолит -->
+      <g>
+        <path id="eneolithic" class="land" d="M40 80 L210 50 L190 190 L40 200 Z" />
+        <text x="120" y="115" text-anchor="middle" class="map-text">
+          <tspan x="120" dy="0" font-weight="bold" fill="#fbbf24">Энеолит</tspan>
+          <tspan x="120" dy="14" font-size="9.5px" fill="#d1d5db">(Ботайская культура)</tspan>
+        </text>
+      </g>
+    </svg>
+  </div>
+  <p class="text-xs text-stone-400 mt-6 text-center">Нажмите на область карты, чтобы открыть испытание эпохи.</p>
+</section>
+
+<!-- Правая панель управления -->
+<section class="space-y-6">
+  
+  <!-- Таблица Племен -->
+  <div class="bg-stone-800 p-6 rounded-xl border border-stone-700 shadow-xl">
+    <h2 class="text-xl font-bold mb-4 text-amber-400">Счет Племен</h2>
+    <div class="space-y-3">
+      <div class="flex justify-between items-center p-3 bg-red-950/40 border border-red-800/60 rounded-lg">
+        <span class="font-semibold text-red-400">🔴 Племя "Охотники"</span>
+        <span id="score-clan1" class="font-bold text-lg">0 очков</span>
+      </div>
+      <div class="flex justify-between items-center p-3 bg-amber-950/40 border border-amber-800/60 rounded-lg">
+        <span class="font-semibold text-amber-400">🟡 Племя "Собиратели"</span>
+        <span id="score-clan2" class="font-bold text-lg">0 очков</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Блок Викторины и ИИ-Эссе -->
+  <div id="quiz-box" class="bg-stone-800 p-6 rounded-xl border border-amber-500/50 shadow-xl hidden">
+    <span id="era-badge" class="inline-block px-2.5 py-1 text-xs font-bold bg-amber-500/20 text-amber-300 rounded mb-3"></span>
+    <h3 id="quiz-title" class="text-lg font-bold text-stone-100 mb-2"></h3>
+    <p id="quiz-question" class="text-sm mb-4 text-stone-300"></p>
     
-    <!-- Карта Стоянок -->
-    <section class="lg:col-span-2 bg-stone-800 p-6 rounded-xl border border-stone-700 shadow-2xl">
-      <h2 class="text-2xl font-bold mb-4 text-amber-400">Карта Древних Стоянок</h2>
-      
-      <div class="relative flex justify-center">
-        <svg id="stone-age-map" viewBox="0 0 600 350" class="w-full h-auto max-w-xl">
-          <!-- Палеолит -->
-          <path id="paleolithic" class="land" d="M200 200 L380 200 L320 320 L180 290 Z" />
-          <text x="270" y="255" text-anchor="middle" fill="#fef3c7" class="font-bold text-sm pointer-events-none">Палеолит (Шакпакаты, Каратау)</text>
+    <!-- Кнопки викторины -->
+    <div id="quiz-options" class="space-y-2 mb-4"></div>
 
-          <!-- Мезолит -->
-          <path id="mesolithic" class="land" d="M220 50 L380 50 L380 190 L200 190 Z" />
-          <text x="300" y="125" text-anchor="middle" fill="#fef3c7" class="font-bold text-sm pointer-events-none">Мезолит (Тельманка, Мичурин)</text>
-
-          <!-- Неолит -->
-          <path id="neolithic" class="land" d="M390 50 L560 30 L540 220 L390 190 Z" />
-          <text x="470" y="125" text-anchor="middle" fill="#fef3c7" class="font-bold text-sm pointer-events-none">Неолит (Сексеул)</text>
-
-          <!-- Энеолит -->
-          <path id="eneolithic" class="land" d="M40 80 L210 50 L190 190 L40 200 Z" />
-          <text x="120" y="125" text-anchor="middle" fill="#fef3c7" class="font-bold text-sm pointer-events-none">Энеолит (Ботайская культура)</text>
-        </svg>
-      </div>
-      <p class="text-xs text-stone-400 mt-4 text-center">Нажмите на область карты, чтобы открыть испытание эпохи.</p>
-    </section>
-
-    <!-- Правая панель управления -->
-    <section class="space-y-6">
-      
-      <!-- Таблица Племен -->
-      <div class="bg-stone-800 p-6 rounded-xl border border-stone-700 shadow-xl">
-        <h2 class="text-xl font-bold mb-4 text-amber-400">Счет Племен</h2>
-        <div class="space-y-3">
-          <div class="flex justify-between items-center p-3 bg-red-950/40 border border-red-800/60 rounded-lg">
-            <span class="font-semibold text-red-400">🔴 Племя "Охотники"</span>
-            <span id="score-clan1" class="font-bold text-lg">0 очков</span>
-          </div>
-          <div class="flex justify-between items-center p-3 bg-amber-950/40 border border-amber-800/60 rounded-lg">
-            <span class="font-semibold text-amber-400">🟡 Племя "Собиратели"</span>
-            <span id="score-clan2" class="font-bold text-lg">0 очков</span>
-          </div>
-        </div>
+    <!-- Раздел для работы с ИИ -->
+    <div id="ai-essay-section" class="mt-6 pt-4 border-t border-stone-700">
+      <div class="flex justify-between items-center mb-3">
+        <span class="text-xs font-bold text-amber-400">🤖 ИИ-Наставник (Gemini)</span>
+        <button id="generate-essay-btn" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-xs font-bold rounded transition text-white shadow">
+          ✨ Сгенерировать тему
+        </button>
       </div>
 
-      <!-- Блок Викторины и ИИ-Эссе -->
-      <div id="quiz-box" class="bg-stone-800 p-6 rounded-xl border border-amber-500/50 shadow-xl hidden">
-        <span id="era-badge" class="inline-block px-2 py-1 text-xs font-bold bg-amber-500/20 text-amber-300 rounded mb-2"></span>
-        <h3 id="quiz-title" class="text-lg font-bold text-stone-100 mb-2"></h3>
-        <p id="quiz-question" class="text-sm mb-4 text-stone-300"></p>
-        
-        <!-- Кнопки викторины -->
-        <div id="quiz-options" class="space-y-2 mb-4"></div>
+      <p id="essay-topic" class="text-xs text-stone-300 italic mb-3 bg-stone-900 p-3 rounded-lg border border-stone-700 leading-relaxed">
+        Нажмите кнопку выше, чтобы ИИ придумал задание для эссе...
+      </p>
+      <textarea id="essay-input" rows="3" class="w-full p-3 bg-stone-900 border border-stone-700 rounded-lg text-xs text-stone-200 mb-3 focus:outline-none focus:border-amber-500 transition" placeholder="Вставьте сюда эссе ученика..."></textarea>
 
-        <!-- Раздел для работы с ИИ -->
-        <div id="ai-essay-section" class="mt-6 pt-4 border-t border-stone-700">
-          <div class="flex justify-between items-center mb-2">
-            <span class="text-xs font-bold text-amber-400">🤖 ИИ-Наставник (Gemini)</span>
-            <button id="generate-essay-btn" class="px-3 py-1 bg-amber-600 hover:bg-amber-500 text-xs font-bold rounded transition text-white">
-              ✨ Сгенерировать тему
-            </button>
-          </div>
+      <button id="check-essay-btn" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-xs font-bold rounded-lg transition text-white shadow">
+        🔍 Проверить эссе с помощью ИИ
+      </button>
 
-          <p id="essay-topic" class="text-xs text-stone-300 italic mb-3 bg-stone-900 p-2.5 rounded border border-stone-700">
-            Нажмите кнопку выше, чтобы ИИ придумал задание для эссе...
-          </p>
+      <!-- Окно ответа ИИ -->
+      <div id="ai-feedback" class="mt-3 p-3 bg-stone-900 border border-stone-700 rounded-lg text-xs text-stone-300 hidden leading-relaxed whitespace-pre-line"></div>
+    </div>
 
-          <textarea id="essay-input" rows="3" class="w-full p-2.5 bg-stone-900 border border-stone-700 rounded text-xs text-stone-200 mb-2 focus:outline-none focus:border-amber-500" placeholder="Вставьте сюда эссе ученика..."></textarea>
+  </div>
 
-          <button id="check-essay-btn" class="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-xs font-bold rounded transition text-white">
-            🔍 Проверить эссе с помощью ИИ
-          </button>
-
-          <!-- Окно ответа ИИ -->
-          <div id="ai-feedback" class="mt-3 p-3 bg-stone-900 border border-stone-700 rounded text-xs text-stone-300 hidden leading-relaxed whitespace-pre-line"></div>
-        </div>
-
-      </div>
-
-    </section>
-  </main>
-
-  <script src="script.js"></script>
-</body>
-</html>
+</section>
