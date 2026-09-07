@@ -1,6 +1,12 @@
-// 1. Вставь сюда твой API-ключ из Google AI Studio
-const API_KEY = "AQ.Ab8RN6KxjjED5LdgOKZElsUY18c6RBtDEsYQhedDi9IDlCPngw"; 
+// Запрашиваем ключ у пользователя или берем из памяти браузера
+let API_KEY = localStorage.getItem("gemini_api_key");
 
+if (!API_KEY) {
+  API_KEY = prompt("Введите ваш Gemini API Key:");
+  if (API_KEY) {
+    localStorage.setItem("gemini_api_key", API_KEY);
+  }
+}
 // Подсчет очков племен
 const scores = {
   clan1: 0,
