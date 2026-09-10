@@ -162,9 +162,9 @@ document.getElementById('generate-essay-btn').onclick = async () => {
   const topicText = document.getElementById('essay-topic');
   const eraBadge = document.getElementById('era-badge').innerText;
 
-  topicText.innerText = "⏳ ИИ генерирует уникальное историческое задание...";
+  topicText.innerText = "⏳ ИИ генерирует уникальное историческое эссе...";
 
-  const promptText = `Ты учитель истории Казахстана. Придумай 1 короткое ролевое задание для эссе по теме "${eraBadge}". В 1-2 предложения (например: "Представь, что ты мастер Ботайской культуры..."). Выдай только текст задания.`;
+  const promptText = `Представь, что ты профессиональный эссеист и историк. Напишите эссе по истории Казахстана в эпохе "${eraBadge}". Тема должна быть интересной, актуальной и стимулировать критическое мышление.`;
 
   try {
     const aiResponse = await askGemini(promptText);
@@ -182,7 +182,7 @@ document.getElementById('check-essay-btn').onclick = async () => {
   const topic = document.getElementById('essay-topic').innerText;
 
   if (!essayText.trim()) {
-    alert("Вставьте текст эссе ученика!");
+    alert("Вставьте текст эссе!");
     return;
   }
 
