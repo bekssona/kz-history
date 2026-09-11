@@ -1,103 +1,210 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Stone Age in Kazakhstan — Игра с ИИ</title>
-  <!-- Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    .land {
-      fill: #475569;
-      stroke: #0f172a;
-      stroke-width: 2;
-      cursor: pointer;
-      transition: all 0.3s ease;
-    }
-    .land:hover {
-      fill: #64748b;
-      filter: drop-shadow(0 0 10px rgba(251, 191, 36, 0.5));
-    }
-  </style>
-</head>
-<body class="bg-stone-900 text-stone-100 font-sans min-h-screen p-6">
+// Подсчет очков племен
+const scores = {
+  clan1: 0,
+  clan2: 0
+};
 
-  <header class="text-center mb-8">
-    <h1 class="text-4xl font-extrabold text-amber-500 mb-2">🗿 Stone Age in Kazakhstan</h1>
-    <p class="text-stone-400">Пройдите путь от Палеолита до Энеолита с поддержкой ИИ-Наставника!</p>
-  </header>
+let currentEraKey = null;
 
-  <main class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
+// Названия эпох для контекста ИИ
+const eraNames = {
+  paleolithic: 'Палеолит в Казахстане (Шакпакаты, Каратау, древнейшие орудия)',
+  mesolithic: 'Мезолит в Казахстане (Тельманка, микролиты, лук и стрелы)',
+  neolithic: 'Неолит в Казахстане (Сексеул, Атбасарская культура, керамика)',
+  eneolithic: 'Энеолит в Казахстане (Ботайская культура, одомашнивание лошадей)'
+};
+
+// Функция получения API-ключа у пользователя
+function getApiKey() {
+  let key = localStorage.getItem("gemini_api_key");
+  
+  if (!key || key.trim() === "") {
+    key = prompt("Введите ваш новый Gemini API Key (начинается на AIza...):");
+    if (key && key.trim() !== "") {
+      localStorage.setItem("gemini_api_key", key.trim());
+    } else {
+      alert("Без API-ключа генерация ИИ работать не будет!");
+      return null;
+    }
+  }
+  return key;
+}
+
+// 2. Универсальная функция обращения к Gemini API
+async function askGemini(promptText) {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error("API Key отсутствует");
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [{ text: promptText }]
+          }
+        ]
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      // Если ключ недействительный, сбрасываем его из памяти, чтобы спросить снова
+      if (response.status === 400 || response.status === 401) {
+        localStorage.removeItem("gemini_api_key");
+        alert("Недействительный API-ключ. Пожалуйста, обновите страницу и введите правильный ключ.");
+      }
+      console.error("Детали ошибки от Google API:", data);
+      throw new Error(data.error?.message || `Ошибка сервера: ${response.status}`);
+    }
+
+    return data.candidates[0].content.parts[0].text;
+  } catch (error) {
+    console.error("Ошибка при вызове Gemini API:", error);
+    throw error;
+  }
+}
+
+// 3. Генерация викторины с помощью ИИ
+async function generateAIQuestion(eraKey) {
+  const eraInfo = eraNames[eraKey] || 'Каменный век в Казахстане';
+  
+  const promptText = `
+    Ты эксперт по истории Казахстана. Создай 1 уникальный тестовый вопрос для школы по теме "${eraInfo}".
     
-    <!-- Карта Стоянок -->
-    <section class="lg:col-span-2 bg-stone-800 p-6 rounded-xl border border-stone-700 shadow-2xl">
-      <h2 class="text-2xl font-bold mb-4 text-amber-400">Карта Древних Стоянок</h2>
-      
-      <div class="relative flex justify-center">
-        <svg id="stone-age-map" viewBox="0 0 600 350" class="w-full h-auto max-w-xl">
-          <!-- Палеолит -->
-          <path id="paleolithic" class="land" d="M200 200 L380 200 L320 320 L180 290 Z" />
-          <text x="270" y="255" text-anchor="middle" fill="#fef3c7" class="font-bold text-sm pointer-events-none">Палеолит (Шакпакаты, Каратау)</text>
+    Верни ответ СТРОГО в формате JSON без кавычек markdown:
+    {
+      "question": "Текст вопроса",
+      "options": ["Вариант 1", "Вариант 2", "Вариант 3"],
+      "correct": 0
+    }
+    Где "correct" — индекс правильного ответа (0, 1 или 2).
+  `;
 
-          <!-- Мезолит -->
-          <path id="mesolithic" class="land" d="M220 50 L380 50 L380 190 L200 190 Z" />
-          <text x="300" y="125" text-anchor="middle" fill="#fef3c7" class="font-bold text-sm pointer-events-none">Мезолит (Тельманка, Мичурин)</text>
+  const rawResponse = await askGemini(promptText);
+  const cleanJson = rawResponse.replace(/```json|```/g, '').trim();
+  return JSON.parse(cleanJson);
+}
 
-          <!-- Неолит -->
-          <path id="neolithic" class="land" d="M390 50 L560 30 L540 220 L390 190 Z" />
-          <text x="470" y="125" text-anchor="middle" fill="#fef3c7" class="font-bold text-sm pointer-events-none">Неолит (Сексеул)</text>
+// 4. Обработка кликов по карте с динамической генерацией
+document.querySelectorAll('.land').forEach(region => {
+  region.addEventListener('click', async (e) => {
+    currentEraKey = e.target.id;
+    const eraTitle = eraNames[currentEraKey];
 
-          <!-- Энеолит -->
-          <path id="eneolithic" class="land" d="M40 80 L210 50 L190 190 L40 200 Z" />
-          <text x="120" y="125" text-anchor="middle" fill="#fef3c7" class="font-bold text-sm pointer-events-none">Энеолит (Ботайская культура)</text>
-        </svg>
-      </div>
-      <p class="text-xs text-stone-400 mt-4 text-center">Нажмите на область карты, чтобы открыть испытание эпохи.</p>
-    </section>
-    <section class="space-y-6">
-      <div class="bg-stone-800 p-6 rounded-xl border border-stone-700 shadow-xl">
-        <h2 class="text-xl font-bold mb-4 text-amber-400">Счет Племен</h2>
-        <div class="space-y-3">
-          <div class="flex justify-between items-center p-3 bg-red-950/40 border border-red-800/60 rounded-lg">
-            <span class="font-semibold text-red-400">🔴 Племя "Охотники"</span>
-            <span id="score-clan1" class="font-bold text-lg">0 очков</span>
-          </div>
-          <div class="flex justify-between items-center p-3 bg-amber-950/40 border border-amber-800/60 rounded-lg">
-            <span class="font-semibold text-amber-400">🟡 Племя "Собиратели"</span>
-            <span id="score-clan2" class="font-bold text-lg">0 очков</span>
-          </div>
-        </div>
-      </div>
-      <div id="quiz-box" class="bg-stone-800 p-6 rounded-xl border border-amber-500/50 shadow-xl hidden">
-        <span id="era-badge" class="inline-block px-2 py-1 text-xs font-bold bg-amber-500/20 text-amber-300 rounded mb-2"></span>
-        <h3 id="quiz-title" class="text-lg font-bold text-stone-100 mb-2"></h3>
-        <p id="quiz-question" class="text-sm mb-4 text-stone-300"></p>
-        <div id="quiz-options" class="space-y-2 mb-4"></div>
-        <div id="ai-essay-section" class="mt-6 pt-4 border-t border-stone-700">
-          <div class="flex justify-between items-center mb-2">
-            <span class="text-xs font-bold text-amber-400">🤖 ИИ-Наставник</span>
-            <button id="generate-essay-btn" class="px-3 py-1 bg-amber-600 hover:bg-amber-500 text-xs font-bold rounded transition text-white">
-              ✨ Сгенерировать эссе
-            </button>
-          </div>
-          <p id="essay-topic" class="text-xs text-stone-300 italic mb-3 bg-stone-900 p-2.5 rounded border border-stone-700">
-            Нажмите кнопку выше, чтобы ИИ придумал эссе...
-          </p>
+    if (!eraTitle) return;
 
-          <textarea id="essay-input" rows="3" class="w-full p-2.5 bg-stone-900 border border-stone-700 rounded text-xs text-stone-200 mb-2 focus:outline-none focus:border-amber-500" placeholder="Вставьте сюда эссе ученика..."></textarea>
+    const quizBox = document.getElementById('quiz-box');
+    const eraBadge = document.getElementById('era-badge');
+    const quizTitle = document.getElementById('quiz-title');
+    const quizQuestion = document.getElementById('quiz-question');
+    const quizOptions = document.getElementById('quiz-options');
+    const feedbackBox = document.getElementById('ai-feedback');
 
-          <button id="check-essay-btn" class="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-xs font-bold rounded transition text-white">
-            🔍 Проверить эссе с помощью ИИ
-          </button>
+    quizBox.classList.remove('hidden');
+    eraBadge.innerText = currentEraKey.toUpperCase();
+    quizTitle.innerText = eraTitle.split('(')[0];
+    quizQuestion.innerText = "⏳ ИИ генерирует уникальный вопрос по этой эпохе...";
+    quizOptions.innerHTML = '';
+    
+    if (feedbackBox) feedbackBox.classList.add('hidden');
 
-          <div id="ai-feedback" class="mt-3 p-3 bg-stone-900 border border-stone-700 rounded text-xs text-stone-300 hidden leading-relaxed whitespace-pre-line"></div>
-        </div>
+    try {
+      const qData = await generateAIQuestion(currentEraKey);
 
-      </div>
+      quizQuestion.innerText = qData.question;
 
-    </section>
-  </main>
+      qData.options.forEach((optionText, index) => {
+        const button = document.createElement('button');
+        button.className = 'w-full text-left p-2.5 bg-stone-700 hover:bg-stone-600 rounded text-sm transition text-stone-200 font-medium mb-1';
+        button.innerText = `${index + 1}. ${optionText}`;
+        button.onclick = () => handleAnswer(index, qData.correct, e.target);
+        quizOptions.appendChild(button);
+      });
 
-  <script src="script.js"></script>
-</body>
-</html>
+    } catch (error) {
+      console.error(error);
+      quizQuestion.innerText = "Не удалось сгенерировать вопрос. Нажмите на регион еще раз.";
+    }
+  });
+});
+
+// 5. Проверка ответа викторины
+function handleAnswer(selectedIndex, correctIndex, regionElement) {
+  if (selectedIndex === correctIndex) {
+    const winningClan = prompt('Правильно! Какое племя получает территорию? Введите 1 (Охотники) или 2 (Собиратели):');
+
+    if (winningClan === '1') {
+      regionElement.style.fill = '#991b1b';
+      scores.clan1 += 150;
+    } else if (winningClan === '2') {
+      regionElement.style.fill = '#d97706';
+      scores.clan2 += 150;
+    }
+
+    document.getElementById('score-clan1').innerText = `${scores.clan1} очков`;
+    document.getElementById('score-clan2').innerText = `${scores.clan2} очков`;
+
+    alert('Отличный ответ! Теперь сгенерируйте и проверьте эссе для получения дополнительных баллов.');
+  } else {
+    alert('Неверно! Изучите материалы эпохи и попробуйте снова.');
+  }
+}
+
+// 6. Генерация задания для эссе
+document.getElementById('generate-essay-btn').onclick = async () => {
+  const topicText = document.getElementById('essay-topic');
+  const eraBadge = document.getElementById('era-badge').innerText;
+
+  topicText.innerText = "⏳ ИИ генерирует уникальное историческое эссе...";
+
+  const promptText = `Представь, что ты профессиональный эссеист и историк. Напишите эссе по истории Казахстана в эпохе "${eraBadge}". Тема должна быть интересной, актуальной и стимулировать критическое мышление.`;
+
+  try {
+    const aiResponse = await askGemini(promptText);
+    topicText.innerText = aiResponse;
+  } catch (error) {
+    console.error(error);
+    topicText.innerText = "Ошибка генерации задания.";
+  }
+};
+
+// 7. Проверка эссе
+document.getElementById('check-essay-btn').onclick = async () => {
+  const essayText = document.getElementById('essay-input').value;
+  const feedbackBox = document.getElementById('ai-feedback');
+  const topic = document.getElementById('essay-topic').innerText;
+
+  if (!essayText.trim()) {
+    alert("Вставьте текст эссе!");
+    return;
+  }
+
+  feedbackBox.classList.remove('hidden');
+  feedbackBox.innerText = "⏳ ИИ-Эксперт оценивает работу...";
+
+  const promptText = `
+    Ты эксперт по истории Казахстана. Оцени эссе ученика.
+    Тема: "${topic}".
+    Текст: "${essayText}".
+    
+    Формат ответа:
+    🏆 Оценка: [Баллы от 1 до 100]
+    ✅ Сильные стороны: [1-2 предложения]
+    💡 Что можно улучшить: [1-2 предложения]
+  `;
+
+  try {
+    const evaluation = await askGemini(promptText);
+    feedbackBox.innerText = evaluation;
+  } catch (error) {
+    console.error(error);
+    feedbackBox.innerText = "Не удалось проверить эссе.";
+  }
+};
