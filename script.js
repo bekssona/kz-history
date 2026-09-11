@@ -35,14 +35,13 @@ async function askGemini(promptText, isJson = false) {
   const apiKey = getApiKey();
   if (!apiKey) throw new Error("API Key отсутствует");
 
-  // ИСПРАВЛЕНО: Актуальное название модели
-  const url = const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+  // Использование актуальной рабочей модели
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
   const requestBody = {
     contents: [{ parts: [{ text: promptText }] }]
   };
 
-  // Запрашиваем чистый JSON, если это требуется
   if (isJson) {
     requestBody.generationConfig = { responseMimeType: "application/json" };
   }
