@@ -34,7 +34,8 @@ async function askGemini(promptText, isJson = false) {
   const apiKey = getApiKey();
   if (!apiKey) throw new Error("API Key отсутствует");
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+  // Использование модели gemini-3.6-flash, указанной сервером
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
 
   const requestBody = {
     contents: [{ parts: [{ text: promptText }] }]
@@ -56,9 +57,9 @@ async function askGemini(promptText, isJson = false) {
     if (!response.ok) {
       if (response.status === 400 || response.status === 401) {
         localStorage.removeItem("gemini_api_key");
-        alert("Недействительный API-ключ. Пожалуйста, обновите страницу и введите его снова.");
+        alert("Недействительный API-ключ. Обновите страницу и введите его снова.");
       }
-      console.error("Детали ошибки от Google API:", data);
+      console.error("Ошибка Google API:", data);
       throw new Error(data.error?.message || `Ошибка сервера: ${response.status}`);
     }
 
