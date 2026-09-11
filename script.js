@@ -29,12 +29,18 @@ function getApiKey() {
   return key;
 }
 
-// 3. Запрос к Gemini API
-async function askGemini(promptText, isJson = false) {
+// Небольшая пауза (для повторных попыток)
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// 3. Запрос к Gemini API (с автоматическими повторными попытками при перегрузке)
+async function askGemini(promptText, isJson = false, retries = 3) {
   const apiKey = getApiKey();
   if (!apiKey) throw new Error("API Key отсутствует");
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+  const MODEL_NAME = "gemini-2.5-flash"; // стабильная модель
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${apiKey}`;
 
   const requestBody = {
     contents: [{ parts: [{ text: promptText }] }]
@@ -44,28 +50,44 @@ async function askGemini(promptText, isJson = false) {
     requestBody.generationConfig = { responseMimeType: "application/json" };
   }
 
-  try {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(requestBody)
-    });
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestBody)
+      });
 
-    const data = await response.json();
+      const data = await response.json();
 
-    if (!response.ok) {
-      if (response.status === 400 || response.status === 401 || response.status === 404) {
-        localStorage.removeItem("gemini_api_key");
-        alert("Недействительный API-ключ или ошибка доступа. Ключ сброшен, введите новый.");
+      if (!response.ok) {
+        if (response.status === 400 || response.status === 401 || response.status === 404) {
+          localStorage.removeItem("gemini_api_key");
+          alert("Недействительный API-ключ или ошибка доступа. Ключ сброшен, введите новый.");
+          throw new Error(data.error?.message || `Ошибка сервера: ${response.status}`);
+        }
+
+        // 503 / 429 — модель перегружена, пробуем ещё раз
+        if ((response.status === 503 || response.status === 429) && attempt < retries) {
+          console.warn(`Модель перегружена (попытка ${attempt}/${retries}), повтор через ${attempt}с...`);
+          await sleep(attempt * 1000);
+          continue;
+        }
+
+        console.error("Ошибка Google API:", data);
+        throw new Error(data.error?.message || `Ошибка сервера: ${response.status}`);
       }
-      console.error("Ошибка Google API:", data);
-      throw new Error(data.error?.message || `Ошибка сервера: ${response.status}`);
-    }
 
-    return data.candidates[0].content.parts[0].text;
-  } catch (error) {
-    console.error("Ошибка при вызове Gemini API:", error);
-    throw error;
+      return data.candidates[0].content.parts[0].text;
+
+    } catch (error) {
+      if (attempt === retries) {
+        console.error("Ошибка при вызове Gemini API:", error);
+        throw error;
+      }
+      // если это была сетевая ошибка (не наша преднамеренная), тоже пробуем ещё раз
+      await sleep(attempt * 1000);
+    }
   }
 }
 
@@ -129,7 +151,7 @@ document.querySelectorAll('.land').forEach(region => {
 
     } catch (error) {
       console.error(error);
-      if (quizQuestion) quizQuestion.innerText = "Не удалось сгенерировать вопрос. Проверьте API Key и нажмите на регион еще раз.";
+      if (quizQuestion) quizQuestion.innerText = "Не удалось сгенерировать вопрос. Модель перегружена или ошибка ключа — попробуйте нажать на регион ещё раз через минуту.";
     }
   });
 });
