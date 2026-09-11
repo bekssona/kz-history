@@ -1,4 +1,4 @@
-// 1. Данные и состояния
+// 1. Состояние игры
 const scores = {
   clan1: 0,
   clan2: 0
@@ -13,12 +13,12 @@ const eraNames = {
   eneolithic: 'Энеолит в Казахстане (Ботайская культура, одомашнивание лошадей)'
 };
 
-// 2. Получение API ключа
+// 2. Функция получения API-ключа
 function getApiKey() {
   let key = localStorage.getItem("gemini_api_key");
   
   if (!key || key.trim() === "") {
-    key = prompt("Введите ваш Gemini API Key (начинается на AIza...):");
+    key = prompt("Введите ваш новый Gemini API Key (начинается на AIza...):");
     if (key && key.trim() !== "") {
       localStorage.setItem("gemini_api_key", key.trim());
     } else {
@@ -29,13 +29,12 @@ function getApiKey() {
   return key;
 }
 
-// 3. Функция вызова Gemini API
+// 3. Функция запроса к Gemini API
 async function askGemini(promptText, isJson = false) {
   const apiKey = getApiKey();
   if (!apiKey) throw new Error("API Key отсутствует");
 
-  // Использование модели gemini-3.6-flash, указанной сервером
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
   const requestBody = {
     contents: [{ parts: [{ text: promptText }] }]
@@ -55,11 +54,10 @@ async function askGemini(promptText, isJson = false) {
     const data = await response.json();
 
     if (!response.ok) {
-      if (response.status === 400 || response.status === 401) {
-        localStorage.removeItem("gemini_api_key");
-        alert("Недействительный API-ключ. Обновите страницу и введите его снова.");
-      }
-      console.error("Ошибка Google API:", data);
+      // При любой ошибке ключа сбрасываем его из памяти
+      localStorage.removeItem("gemini_api_key");
+      alert("Ошибка API-ключа или доступа. Ключ сброшен, обновите страницу и введите новый API Key.");
+      console.error("Детали ошибки Google API:", data);
       throw new Error(data.error?.message || `Ошибка сервера: ${response.status}`);
     }
 
@@ -70,7 +68,7 @@ async function askGemini(promptText, isJson = false) {
   }
 }
 
-// 4. Генерация вопроса
+// 4. Генерация викторины
 async function generateAIQuestion(eraKey) {
   const eraInfo = eraNames[eraKey] || 'Каменный век в Казахстане';
   
@@ -90,7 +88,7 @@ async function generateAIQuestion(eraKey) {
   return JSON.parse(rawResponse);
 }
 
-// 5. Обработка кликов по карте
+// 5. Клик по карте
 document.querySelectorAll('.land').forEach(region => {
   region.addEventListener('click', async (e) => {
     currentEraKey = e.currentTarget.id;
@@ -128,7 +126,7 @@ document.querySelectorAll('.land').forEach(region => {
 
     } catch (error) {
       console.error(error);
-      quizQuestion.innerText = "Не удалось сгенерировать вопрос. Нажмите на регион еще раз.";
+      quizQuestion.innerText = "Не удалось сгенерировать вопрос. Проверьте API Key и нажмите на регион еще раз.";
     }
   });
 });
@@ -155,7 +153,7 @@ function handleAnswer(selectedIndex, correctIndex, regionElement) {
   }
 }
 
-// 7. Генерация темы эссе
+// 7. Генерация эссе
 document.getElementById('generate-essay-btn').onclick = async () => {
   const topicText = document.getElementById('essay-topic');
   const eraBadge = document.getElementById('era-badge').innerText;
@@ -167,7 +165,7 @@ document.getElementById('generate-essay-btn').onclick = async () => {
 
   topicText.innerText = "⏳ ИИ генерирует тему эссе...";
 
-  const promptText = `Представь, что ты профессиональный историк. Напиши 1 тему эссе по истории Казахстана в эпоху "${eraBadge}". Напиши только формулировку темы без лишнего текста.`;
+  const promptText = `Представь, что ты профессиональный историк. Напиши 1 тему эссе по истории Казахстана в эпоху "${eraBadge}". Сформулируй только тему без вводных фраз.`;
 
   try {
     const aiResponse = await askGemini(promptText);
@@ -178,7 +176,7 @@ document.getElementById('generate-essay-btn').onclick = async () => {
   }
 };
 
-// 8. Проверка эссе
+// 8. Оценка эссе
 document.getElementById('check-essay-btn').onclick = async () => {
   const essayText = document.getElementById('essay-input').value;
   const feedbackBox = document.getElementById('ai-feedback');
