@@ -1,4 +1,4 @@
-// 1. Состояние игры
+// 1. Game State
 const scores = {
   clan1: 0,
   clan2: 0
@@ -7,39 +7,39 @@ const scores = {
 let currentEraKey = null;
 
 const eraNames = {
-  paleolithic: 'Палеолит в Казахстане (Шакпакаты, Каратау, древнейшие орудия)',
-  mesolithic: 'Мезолит в Казахстане (Тельманка, микролиты, лук и стрелы)',
-  neolithic: 'Неолит в Казахстане (Сексеул, Атбасарская культура, керамика)',
-  eneolithic: 'Энеолит в Казахстане (Ботайская культура, одомашнивание лошадей)'
+  paleolithic: 'Paleolithic in Kazakhstan (Shakpakaty, Karatau, ancient tools)',
+  mesolithic: 'Mesolithic in Kazakhstan (Telmanka, microliths, bow and arrow)',
+  neolithic: 'Neolithic in Kazakhstan (Sekseul, Atbasar culture, ceramics)',
+  eneolithic: 'Eneolithic in Kazakhstan (Botai culture, horse domestication)'
 };
 
-// 2. Функция получения API-ключа
+// 2. API Key Retrieval
 function getApiKey() {
   let key = localStorage.getItem("gemini_api_key");
   
   if (!key || key.trim() === "") {
-    key = prompt("Введите ваш Gemini API Key (начинается на AIza...):");
+    key = prompt("Enter your Gemini API Key (starts with AIza...):");
     if (key && key.trim() !== "") {
       localStorage.setItem("gemini_api_key", key.trim());
     } else {
-      alert("Без API-ключа генерация ИИ работать не будет!");
+      alert("AI generation will not work without an API key!");
       return null;
     }
   }
   return key;
 }
 
-// Небольшая пауза (для повторных попыток)
+// Short pause (for retry attempts)
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// 3. Запрос к Gemini API (с автоматическими повторными попытками при перегрузке)
+// 3. Gemini API Request (with automatic retries on overload)
 async function askGemini(promptText, isJson = false, retries = 3) {
   const apiKey = getApiKey();
-  if (!apiKey) throw new Error("API Key отсутствует");
+  if (!apiKey) throw new Error("API Key missing");
 
-  const MODEL_NAME = "gemini-3.6-flash"; // актуальная модель Google
+  const MODEL_NAME = "gemini-3.6-flash"; // Current Google model
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${apiKey}`;
 
   const requestBody = {
@@ -63,55 +63,55 @@ async function askGemini(promptText, isJson = false, retries = 3) {
       if (!response.ok) {
         if (response.status === 400 || response.status === 401 || response.status === 404) {
           localStorage.removeItem("gemini_api_key");
-          alert("Недействительный API-ключ или ошибка доступа. Ключ сброшен, введите новый.");
-          throw new Error(data.error?.message || `Ошибка сервера: ${response.status}`);
+          alert("Invalid API key or access error. Key reset, please enter a new one.");
+          throw new Error(data.error?.message || `Server error: ${response.status}`);
         }
 
-        // 503 / 429 — модель перегружена, пробуем ещё раз
+        // 503 / 429 — Model overloaded, retry
         if ((response.status === 503 || response.status === 429) && attempt < retries) {
-          console.warn(`Модель перегружена (попытка ${attempt}/${retries}), повтор через ${attempt}с...`);
+          console.warn(`Model overloaded (attempt ${attempt}/${retries}), retrying in ${attempt}s...`);
           await sleep(attempt * 1000);
           continue;
         }
 
-        console.error("Ошибка Google API:", data);
-        throw new Error(data.error?.message || `Ошибка сервера: ${response.status}`);
+        console.error("Google API Error:", data);
+        throw new Error(data.error?.message || `Server error: ${response.status}`);
       }
 
       return data.candidates[0].content.parts[0].text;
 
     } catch (error) {
       if (attempt === retries) {
-        console.error("Ошибка при вызове Gemini API:", error);
+        console.error("Error calling Gemini API:", error);
         throw error;
       }
-      // если это была сетевая ошибка (не наша преднамеренная), тоже пробуем ещё раз
+      // If it was a network error, retry as well
       await sleep(attempt * 1000);
     }
   }
 }
 
-// 4. Генерация викторины
+// 4. Quiz Generation
 async function generateAIQuestion(eraKey) {
-  const eraInfo = eraNames[eraKey] || 'Каменный век в Казахстане';
+  const eraInfo = eraNames[eraKey] || 'Stone Age in Kazakhstan';
   
   const promptText = `
-    Ты эксперт по истории Казахстана. Создай 1 уникальный тестовый вопрос для школы по теме "${eraInfo}".
+    You are an expert in the history of Kazakhstan. Create 1 unique school multiple-choice quiz question about "${eraInfo}".
     
-    Верни ответ СТРОГО в формате JSON:
+    Return the response STRICTLY in JSON format:
     {
-      "question": "Текст вопроса",
-      "options": ["Вариант 1", "Вариант 2", "Вариант 3"],
+      "question": "Question text",
+      "options": ["Option 1", "Option 2", "Option 3"],
       "correct": 0
     }
-    Где "correct" — индекс правильного ответа (0, 1 или 2).
+    Where "correct" is the index of the correct option (0, 1, or 2).
   `;
 
   const rawResponse = await askGemini(promptText, true);
   return JSON.parse(rawResponse);
 }
 
-// 5. Клик по карте
+// 5. Map Click Event
 document.querySelectorAll('.land').forEach(region => {
   region.addEventListener('click', async (e) => {
     currentEraKey = e.currentTarget.id;
@@ -129,7 +129,7 @@ document.querySelectorAll('.land').forEach(region => {
     if (quizBox) quizBox.classList.remove('hidden');
     if (eraBadge) eraBadge.innerText = currentEraKey.toUpperCase();
     if (quizTitle) quizTitle.innerText = eraTitle.split('(')[0];
-    if (quizQuestion) quizQuestion.innerText = "⏳ ИИ генерирует уникальный вопрос по этой эпохе...";
+    if (quizQuestion) quizQuestion.innerText = "⏳ AI is generating a unique question for this era...";
     if (quizOptions) quizOptions.innerHTML = '';
     
     if (feedbackBox) feedbackBox.classList.add('hidden');
@@ -151,15 +151,15 @@ document.querySelectorAll('.land').forEach(region => {
 
     } catch (error) {
       console.error(error);
-      if (quizQuestion) quizQuestion.innerText = "Не удалось сгенерировать вопрос. Модель перегружена или ошибка ключа — попробуйте нажать на регион ещё раз через минуту.";
+      if (quizQuestion) quizQuestion.innerText = "Failed to generate a question. The model is overloaded or there is a key error — try clicking the region again in a minute.";
     }
   });
 });
 
-// 6. Проверка ответа
+// 6. Answer Verification
 function handleAnswer(selectedIndex, correctIndex, regionElement) {
   if (selectedIndex === correctIndex) {
-    const winningClan = prompt('Правильно! Какое племя получает территорию? Введите 1 (Охотники) или 2 (Собиратели):');
+    const winningClan = prompt('Correct! Which clan gets the territory? Enter 1 (Hunters) or 2 (Gatherers):');
 
     if (winningClan === '1') {
       regionElement.style.fill = '#991b1b';
@@ -171,16 +171,16 @@ function handleAnswer(selectedIndex, correctIndex, regionElement) {
 
     const clan1Elem = document.getElementById('score-clan1');
     const clan2Elem = document.getElementById('score-clan2');
-    if (clan1Elem) clan1Elem.innerText = `${scores.clan1} очков`;
-    if (clan2Elem) clan2Elem.innerText = `${scores.clan2} очков`;
+    if (clan1Elem) clan1Elem.innerText = `${scores.clan1} pts`;
+    if (clan2Elem) clan2Elem.innerText = `${scores.clan2} pts`;
 
-    alert('Отличный ответ! Теперь сгенерируйте и проверьте эссе для получения дополнительных баллов.');
+    alert('Great job! Now generate and review an essay to earn additional points.');
   } else {
-    alert('Неверно! Изучите материалы эпохи и попробуйте снова.');
+    alert('Incorrect! Review the materials for this era and try again.');
   }
 }
 
-// 7. Генерация эссе
+// 7. Essay Topic Generation
 const genEssayBtn = document.getElementById('generate-essay-btn');
 if (genEssayBtn) {
   genEssayBtn.onclick = async () => {
@@ -189,25 +189,25 @@ if (genEssayBtn) {
     const eraBadge = eraBadgeElem ? eraBadgeElem.innerText : '';
 
     if (!eraBadge) {
-      alert("Сначала выберите эпоху на карте!");
+      alert("Please select an era on the map first!");
       return;
     }
 
-    if (topicText) topicText.innerText = "⏳ ИИ генерирует тему эссе...";
+    if (topicText) topicText.innerText = "⏳ AI is generating an essay topic...";
 
-    const promptText = `Представь, что ты профессиональный историк. Напиши 1 тему эссе по истории Казахстана в эпоху "${eraBadge}". Сформулируй только тему без вводных фраз.`;
+    const promptText = `Imagine you are a professional historian. Write 1 essay topic about the history of Kazakhstan during the "${eraBadge}" era. Provide only the topic without introductory phrases.`;
 
     try {
       const aiResponse = await askGemini(promptText);
       if (topicText) topicText.innerText = aiResponse;
     } catch (error) {
       console.error(error);
-      if (topicText) topicText.innerText = "Ошибка генерации задания.";
+      if (topicText) topicText.innerText = "Failed to generate assignment.";
     }
   };
 }
 
-// 8. Оценка эссе
+// 8. Essay Evaluation
 const checkEssayBtn = document.getElementById('check-essay-btn');
 if (checkEssayBtn) {
   checkEssayBtn.onclick = async () => {
@@ -218,24 +218,24 @@ if (checkEssayBtn) {
     const topic = topicElem ? topicElem.innerText : '';
 
     if (!essayText.trim()) {
-      alert("Вставьте текст эссе!");
+      alert("Please paste the essay text!");
       return;
     }
 
     if (feedbackBox) {
       feedbackBox.classList.remove('hidden');
-      feedbackBox.innerText = "⏳ ИИ-Эксперт оценивает работу...";
+      feedbackBox.innerText = "⏳ AI Expert is evaluating the essay...";
     }
 
     const promptText = `
-      Ты эксперт по истории Казахстана. Оцени эссе ученика.
-      Тема: "${topic}".
-      Текст: "${essayText}".
+      You are an expert in the history of Kazakhstan. Evaluate the student's essay.
+      Topic: "${topic}".
+      Text: "${essayText}".
       
-      Формат ответа:
-      🏆 Оценка: [Баллы от 1 до 100]
-      ✅ Сильные стороны: [1-2 предложения]
-      💡 Что можно улучшить: [1-2 предложения]
+      Response format:
+      🏆 Score: [Points from 1 to 100]
+      ✅ Strengths: [1-2 sentences]
+      💡 Areas for improvement: [1-2 sentences]
     `;
 
     try {
@@ -243,7 +243,7 @@ if (checkEssayBtn) {
       if (feedbackBox) feedbackBox.innerText = evaluation;
     } catch (error) {
       console.error(error);
-      if (feedbackBox) feedbackBox.innerText = "Не удалось проверить эссе.";
+      if (feedbackBox) feedbackBox.innerText = "Failed to review the essay.";
     }
   };
 }
