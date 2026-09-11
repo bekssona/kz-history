@@ -1,4 +1,4 @@
-// Подсчет очков племен
+// 1. Состояние игры
 const scores = {
   clan1: 0,
   clan2: 0
@@ -6,7 +6,6 @@ const scores = {
 
 let currentEraKey = null;
 
-// Названия эпох для контекста ИИ
 const eraNames = {
   paleolithic: 'Палеолит в Казахстане (Шакпакаты, Каратау, древнейшие орудия)',
   mesolithic: 'Мезолит в Казахстане (Тельманка, микролиты, лук и стрелы)',
@@ -14,12 +13,12 @@ const eraNames = {
   eneolithic: 'Энеолит в Казахстане (Ботайская культура, одомашнивание лошадей)'
 };
 
-// Функция получения API-ключа у пользователя
+// 2. Функция получения API-ключа
 function getApiKey() {
   let key = localStorage.getItem("gemini_api_key");
   
   if (!key || key.trim() === "") {
-    key = prompt("Введите ваш новый Gemini API Key (начинается на AIza...):");
+    key = prompt("Введите ваш Gemini API Key (начинается на AIza...):");
     if (key && key.trim() !== "") {
       localStorage.setItem("gemini_api_key", key.trim());
     } else {
@@ -30,13 +29,12 @@ function getApiKey() {
   return key;
 }
 
-// 2. Универсальная функция обращения к Gemini API
+// 3. Запрос к Gemini API
 async function askGemini(promptText, isJson = false) {
   const apiKey = getApiKey();
   if (!apiKey) throw new Error("API Key отсутствует");
 
-  // Актуальная модель Gemini 3.6 Flash
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
   const requestBody = {
     contents: [{ parts: [{ text: promptText }] }]
@@ -71,14 +69,14 @@ async function askGemini(promptText, isJson = false) {
   }
 }
 
-// 3. Генерация викторины с помощью ИИ
+// 4. Генерация викторины
 async function generateAIQuestion(eraKey) {
   const eraInfo = eraNames[eraKey] || 'Каменный век в Казахстане';
   
   const promptText = `
     Ты эксперт по истории Казахстана. Создай 1 уникальный тестовый вопрос для школы по теме "${eraInfo}".
     
-    Верни ответ СТРОГО в формате JSON без кавычек markdown:
+    Верни ответ СТРОГО в формате JSON:
     {
       "question": "Текст вопроса",
       "options": ["Вариант 1", "Вариант 2", "Вариант 3"],
@@ -91,7 +89,7 @@ async function generateAIQuestion(eraKey) {
   return JSON.parse(rawResponse);
 }
 
-// 4. Обработка кликов по карте
+// 5. Клик по карте
 document.querySelectorAll('.land').forEach(region => {
   region.addEventListener('click', async (e) => {
     currentEraKey = e.currentTarget.id;
@@ -106,35 +104,37 @@ document.querySelectorAll('.land').forEach(region => {
     const quizOptions = document.getElementById('quiz-options');
     const feedbackBox = document.getElementById('ai-feedback');
 
-    quizBox.classList.remove('hidden');
-    eraBadge.innerText = currentEraKey.toUpperCase();
-    quizTitle.innerText = eraTitle.split('(')[0];
-    quizQuestion.innerText = "⏳ ИИ генерирует уникальный вопрос по этой эпохе...";
-    quizOptions.innerHTML = '';
+    if (quizBox) quizBox.classList.remove('hidden');
+    if (eraBadge) eraBadge.innerText = currentEraKey.toUpperCase();
+    if (quizTitle) quizTitle.innerText = eraTitle.split('(')[0];
+    if (quizQuestion) quizQuestion.innerText = "⏳ ИИ генерирует уникальный вопрос по этой эпохе...";
+    if (quizOptions) quizOptions.innerHTML = '';
     
     if (feedbackBox) feedbackBox.classList.add('hidden');
 
     try {
       const qData = await generateAIQuestion(currentEraKey);
 
-      quizQuestion.innerText = qData.question;
+      if (quizQuestion) quizQuestion.innerText = qData.question;
 
-      qData.options.forEach((optionText, index) => {
-        const button = document.createElement('button');
-        button.className = 'w-full text-left p-2.5 bg-stone-700 hover:bg-stone-600 rounded text-sm transition text-stone-200 font-medium mb-1';
-        button.innerText = `${index + 1}. ${optionText}`;
-        button.onclick = () => handleAnswer(index, qData.correct, e.currentTarget);
-        quizOptions.appendChild(button);
-      });
+      if (quizOptions) {
+        qData.options.forEach((optionText, index) => {
+          const button = document.createElement('button');
+          button.className = 'w-full text-left p-2.5 bg-stone-700 hover:bg-stone-600 rounded text-sm transition text-stone-200 font-medium mb-1';
+          button.innerText = `${index + 1}. ${optionText}`;
+          button.onclick = () => handleAnswer(index, qData.correct, e.currentTarget);
+          quizOptions.appendChild(button);
+        });
+      }
 
     } catch (error) {
       console.error(error);
-      quizQuestion.innerText = "Не удалось сгенерировать вопрос. Нажмите на регион еще раз.";
+      if (quizQuestion) quizQuestion.innerText = "Не удалось сгенерировать вопрос. Проверьте API Key и нажмите на регион еще раз.";
     }
   });
 });
 
-// 5. Проверка ответа викторины
+// 6. Проверка ответа
 function handleAnswer(selectedIndex, correctIndex, regionElement) {
   if (selectedIndex === correctIndex) {
     const winningClan = prompt('Правильно! Какое племя получает территорию? Введите 1 (Охотники) или 2 (Собиратели):');
@@ -147,8 +147,10 @@ function handleAnswer(selectedIndex, correctIndex, regionElement) {
       scores.clan2 += 150;
     }
 
-    document.getElementById('score-clan1').innerText = `${scores.clan1} очков`;
-    document.getElementById('score-clan2').innerText = `${scores.clan2} очков`;
+    const clan1Elem = document.getElementById('score-clan1');
+    const clan2Elem = document.getElementById('score-clan2');
+    if (clan1Elem) clan1Elem.innerText = `${scores.clan1} очков`;
+    if (clan2Elem) clan2Elem.innerText = `${scores.clan2} очков`;
 
     alert('Отличный ответ! Теперь сгенерируйте и проверьте эссе для получения дополнительных баллов.');
   } else {
@@ -156,59 +158,70 @@ function handleAnswer(selectedIndex, correctIndex, regionElement) {
   }
 }
 
-// 6. Генерация задания для эссе
-document.getElementById('generate-essay-btn').onclick = async () => {
-  const topicText = document.getElementById('essay-topic');
-  const eraBadge = document.getElementById('era-badge').innerText;
+// 7. Генерация эссе
+const genEssayBtn = document.getElementById('generate-essay-btn');
+if (genEssayBtn) {
+  genEssayBtn.onclick = async () => {
+    const topicText = document.getElementById('essay-topic');
+    const eraBadgeElem = document.getElementById('era-badge');
+    const eraBadge = eraBadgeElem ? eraBadgeElem.innerText : '';
 
-  if (!eraBadge) {
-    alert("Сначала выберите эпоху на карте!");
-    return;
-  }
+    if (!eraBadge) {
+      alert("Сначала выберите эпоху на карте!");
+      return;
+    }
 
-  topicText.innerText = "⏳ ИИ генерирует тему для эссе...";
+    if (topicText) topicText.innerText = "⏳ ИИ генерирует тему эссе...";
 
-  const promptText = `Представь, что ты профессиональный эссеист и историк. Напиши тему эссе по истории Казахстана в эпохе "${eraBadge}". Сформулируй только тему без пояснений.`;
+    const promptText = `Представь, что ты профессиональный историк. Напиши 1 тему эссе по истории Казахстана в эпоху "${eraBadge}". Сформулируй только тему без вводных фраз.`;
 
-  try {
-    const aiResponse = await askGemini(promptText);
-    topicText.innerText = aiResponse;
-  } catch (error) {
-    console.error(error);
-    topicText.innerText = "Ошибка генерации задания.";
-  }
-};
+    try {
+      const aiResponse = await askGemini(promptText);
+      if (topicText) topicText.innerText = aiResponse;
+    } catch (error) {
+      console.error(error);
+      if (topicText) topicText.innerText = "Ошибка генерации задания.";
+    }
+  };
+}
 
-// 7. Проверка эссе
-document.getElementById('check-essay-btn').onclick = async () => {
-  const essayText = document.getElementById('essay-input').value;
-  const feedbackBox = document.getElementById('ai-feedback');
-  const topic = document.getElementById('essay-topic').innerText;
+// 8. Оценка эссе
+const checkEssayBtn = document.getElementById('check-essay-btn');
+if (checkEssayBtn) {
+  checkEssayBtn.onclick = async () => {
+    const essayInputElem = document.getElementById('essay-input');
+    const essayText = essayInputElem ? essayInputElem.value : '';
+    const feedbackBox = document.getElementById('ai-feedback');
+    const topicElem = document.getElementById('essay-topic');
+    const topic = topicElem ? topicElem.innerText : '';
 
-  if (!essayText.trim()) {
-    alert("Вставьте текст эссе!");
-    return;
-  }
+    if (!essayText.trim()) {
+      alert("Вставьте текст эссе!");
+      return;
+    }
 
-  feedbackBox.classList.remove('hidden');
-  feedbackBox.innerText = "⏳ ИИ-Эксперт оценивает работу...";
+    if (feedbackBox) {
+      feedbackBox.classList.remove('hidden');
+      feedbackBox.innerText = "⏳ ИИ-Эксперт оценивает работу...";
+    }
 
-  const promptText = `
-    Ты эксперт по истории Казахстана. Оцени эссе ученика.
-    Тема: "${topic}".
-    Текст: "${essayText}".
-    
-    Формат ответа:
-    🏆 Оценка: [Баллы от 1 до 100]
-    ✅ Сильные стороны: [1-2 предложения]
-    💡 Что можно улучшить: [1-2 предложения]
-  `;
+    const promptText = `
+      Ты эксперт по истории Казахстана. Оцени эссе ученика.
+      Тема: "${topic}".
+      Текст: "${essayText}".
+      
+      Формат ответа:
+      🏆 Оценка: [Баллы от 1 до 100]
+      ✅ Сильные стороны: [1-2 предложения]
+      💡 Что можно улучшить: [1-2 предложения]
+    `;
 
-  try {
-    const evaluation = await askGemini(promptText);
-    feedbackBox.innerText = evaluation;
-  } catch (error) {
-    console.error(error);
-    feedbackBox.innerText = "Не удалось проверить эссе.";
-  }
-};
+    try {
+      const evaluation = await askGemini(promptText);
+      if (feedbackBox) feedbackBox.innerText = evaluation;
+    } catch (error) {
+      console.error(error);
+      if (feedbackBox) feedbackBox.innerText = "Не удалось проверить эссе.";
+    }
+  };
+}
