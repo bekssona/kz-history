@@ -36,7 +36,7 @@ async function askGemini(promptText, isJson = false) {
   if (!apiKey) throw new Error("API Key отсутствует");
 
   // ИСПРАВЛЕНО: Актуальное название модели
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  const url = const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
   const requestBody = {
     contents: [{ parts: [{ text: promptText }] }]
