@@ -1,4 +1,4 @@
-// 1. Состояние игры
+// Подсчет очков племен
 const scores = {
   clan1: 0,
   clan2: 0
@@ -6,6 +6,7 @@ const scores = {
 
 let currentEraKey = null;
 
+// Названия эпох для контекста ИИ
 const eraNames = {
   paleolithic: 'Палеолит в Казахстане (Шакпакаты, Каратау, древнейшие орудия)',
   mesolithic: 'Мезолит в Казахстане (Тельманка, микролиты, лук и стрелы)',
@@ -13,7 +14,7 @@ const eraNames = {
   eneolithic: 'Энеолит в Казахстане (Ботайская культура, одомашнивание лошадей)'
 };
 
-// 2. Функция получения API-ключа
+// Функция получения API-ключа у пользователя
 function getApiKey() {
   let key = localStorage.getItem("gemini_api_key");
   
@@ -29,12 +30,13 @@ function getApiKey() {
   return key;
 }
 
-// 3. Функция запроса к Gemini API
+// 2. Универсальная функция обращения к Gemini API
 async function askGemini(promptText, isJson = false) {
   const apiKey = getApiKey();
   if (!apiKey) throw new Error("API Key отсутствует");
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  // Использование наиболее стабильной модели для бесплатных ключей
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
   const requestBody = {
     contents: [{ parts: [{ text: promptText }] }]
@@ -54,9 +56,10 @@ async function askGemini(promptText, isJson = false) {
     const data = await response.json();
 
     if (!response.ok) {
-      // При любой ошибке ключа сбрасываем его из памяти
-      localStorage.removeItem("gemini_api_key");
-      alert("Ошибка API-ключа или доступа. Ключ сброшен, обновите страницу и введите новый API Key.");
+      if (response.status === 400 || response.status === 401 || response.status === 404) {
+        localStorage.removeItem("gemini_api_key");
+        alert("Недействительный API-ключ или модель недоступна. Ключ сброшен, введите новый.");
+      }
       console.error("Детали ошибки Google API:", data);
       throw new Error(data.error?.message || `Ошибка сервера: ${response.status}`);
     }
@@ -68,14 +71,14 @@ async function askGemini(promptText, isJson = false) {
   }
 }
 
-// 4. Генерация викторины
+// 3. Генерация викторины с помощью ИИ
 async function generateAIQuestion(eraKey) {
   const eraInfo = eraNames[eraKey] || 'Каменный век в Казахстане';
   
   const promptText = `
     Ты эксперт по истории Казахстана. Создай 1 уникальный тестовый вопрос для школы по теме "${eraInfo}".
     
-    Верни ответ СТРОГО в формате JSON:
+    Верни ответ СТРОГО в формате JSON без кавычек markdown:
     {
       "question": "Текст вопроса",
       "options": ["Вариант 1", "Вариант 2", "Вариант 3"],
@@ -88,7 +91,7 @@ async function generateAIQuestion(eraKey) {
   return JSON.parse(rawResponse);
 }
 
-// 5. Клик по карте
+// 4. Обработка кликов по карте
 document.querySelectorAll('.land').forEach(region => {
   region.addEventListener('click', async (e) => {
     currentEraKey = e.currentTarget.id;
@@ -126,12 +129,12 @@ document.querySelectorAll('.land').forEach(region => {
 
     } catch (error) {
       console.error(error);
-      quizQuestion.innerText = "Не удалось сгенерировать вопрос. Проверьте API Key и нажмите на регион еще раз.";
+      quizQuestion.innerText = "Не удалось сгенерировать вопрос. Нажмите на регион еще раз.";
     }
   });
 });
 
-// 6. Проверка ответа
+// 5. Проверка ответа викторины
 function handleAnswer(selectedIndex, correctIndex, regionElement) {
   if (selectedIndex === correctIndex) {
     const winningClan = prompt('Правильно! Какое племя получает территорию? Введите 1 (Охотники) или 2 (Собиратели):');
@@ -153,7 +156,7 @@ function handleAnswer(selectedIndex, correctIndex, regionElement) {
   }
 }
 
-// 7. Генерация эссе
+// 6. Генерация задания для эссе
 document.getElementById('generate-essay-btn').onclick = async () => {
   const topicText = document.getElementById('essay-topic');
   const eraBadge = document.getElementById('era-badge').innerText;
@@ -163,9 +166,9 @@ document.getElementById('generate-essay-btn').onclick = async () => {
     return;
   }
 
-  topicText.innerText = "⏳ ИИ генерирует тему эссе...";
+  topicText.innerText = "⏳ ИИ генерирует тему для эссе...";
 
-  const promptText = `Представь, что ты профессиональный историк. Напиши 1 тему эссе по истории Казахстана в эпоху "${eraBadge}". Сформулируй только тему без вводных фраз.`;
+  const promptText = `Представь, что ты профессиональный эссеист и историк. Напиши тему эссе по истории Казахстана в эпохе "${eraBadge}". Сформулируй только тему без пояснений.`;
 
   try {
     const aiResponse = await askGemini(promptText);
@@ -176,7 +179,7 @@ document.getElementById('generate-essay-btn').onclick = async () => {
   }
 };
 
-// 8. Оценка эссе
+// 7. Проверка эссе
 document.getElementById('check-essay-btn').onclick = async () => {
   const essayText = document.getElementById('essay-input').value;
   const feedbackBox = document.getElementById('ai-feedback');
