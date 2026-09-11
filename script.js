@@ -35,8 +35,8 @@ async function askGemini(promptText, isJson = false) {
   const apiKey = getApiKey();
   if (!apiKey) throw new Error("API Key отсутствует");
 
-  // Стабильный v1 эндпоинт для gemini-2.5-flash
-  const url = `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+  // Актуальная модель Gemini 3.6 Flash
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`;
 
   const requestBody = {
     contents: [{ parts: [{ text: promptText }] }]
@@ -58,9 +58,9 @@ async function askGemini(promptText, isJson = false) {
     if (!response.ok) {
       if (response.status === 400 || response.status === 401 || response.status === 404) {
         localStorage.removeItem("gemini_api_key");
-        alert("Ошибка ключа или доступа к модели. Нажмите OK, чтобы ввести ключ заново.");
+        alert("Недействительный API-ключ или ошибка доступа. Ключ сброшен, введите новый.");
       }
-      console.error("Детали ошибки Google API:", data);
+      console.error("Ошибка Google API:", data);
       throw new Error(data.error?.message || `Ошибка сервера: ${response.status}`);
     }
 
@@ -69,7 +69,6 @@ async function askGemini(promptText, isJson = false) {
     console.error("Ошибка при вызове Gemini API:", error);
     throw error;
   }
-}
 }
 
 // 3. Генерация викторины с помощью ИИ
